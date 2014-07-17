@@ -43,8 +43,32 @@ class GraphiteRequestTimingMiddleware(object):
         except AttributeError:
             pass
 
+        thread_locals.request = request
+        request.stats_timings = defaultdict(lambda: 0)
+        request.stats_counts = defaultdict(lambda: 0)
+
     def process_response(self, request, response):
         self._record_time(request)
+
+        timings = getattr(request, "stats_timings", {})
+        counts = getattr(request, "stats_counts", {})
+        thread_locals.request = None
+
+        for key, value in timings.iteritems():
+            statsd.timing(
+                'view.{module}.{name}.{method}.{key}'.format(
+                    module=request._view_module,
+                    name=request._view_name,
+                    method=request.method,
+                    key=key), value)
+
+        for key, value in counts.iteritems():
+            statsd.incr(
+                'view.{module}.{name}.{method}.{key}'.format(
+                    module=request._view_module,
+                    name=request._view_name, method=request.method,
+                    key=key), value)
+
         return response
 
     def process_exception(self, request, exception):
@@ -58,30 +82,6 @@ class GraphiteRequestTimingMiddleware(object):
             statsd.timing('view.{module}.{name}.{method}'.format(**data), ms)
             statsd.timing('view.{module}.{method}'.format(**data), ms)
             statsd.timing('view.{method}'.format(**data), ms)
-
-
-class GraphiteRequestDatabaseTimingMiddleware(object):
-    def process_view(self, request, view_func, view_args, view_kwargs):
-        thread_locals.request = request
-        request.stats_timings = defaultdict(lambda: 0)
-        request.stats_counts = defaultdict(lambda: 0)
-
-
-    def process_response(self, request, response):
-        timings = getattr(request, "stats_timings", {})
-        counts = getattr(request, "stats_counts", {})
-        thread_locals.request = None
-
-        for key, value in timings.iteritems():
-            statsd.timing(key, value)
-
-        for key, value in counts.iteritems():
-            statsd.incr(key, value)
-
-        return response
-
-    def process_exception(self, request, exception):
-        thread_locals.request = None
 
 
 class TastyPieRequestTimingMiddleware(GraphiteRequestTimingMiddleware):

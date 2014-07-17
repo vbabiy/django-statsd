@@ -12,8 +12,8 @@ def wrapped(method, stat_name, *args, **kwargs):
 
     try:
         request = thread_locals.request
-        request.stats_timings["request.{}".format(stat_name)] += duration
-        request.stats_counts["request.{}".format(stat_name)] += 1
+        request.stats_timings[stat_name] += duration
+        request.stats_counts[stat_name] += 1
     except AttributeError:
         pass
 
