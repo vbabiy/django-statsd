@@ -1,11 +1,21 @@
-from django.http import Http404
-from django_statsd.clients import statsd
+from collections import defaultdict
 import inspect
 import time
 
+from django.http import Http404
+
+from django_statsd.clients import statsd
+
+
+try:
+    from django.utils._threading_local import local
+except ImportError:
+    from threading import local
+
+thread_locals = local()
+
 
 class GraphiteMiddleware(object):
-
     def process_response(self, request, response):
         statsd.incr('response.%s' % response.status_code)
         if hasattr(request, 'user') and request.user.is_authenticated():
@@ -50,6 +60,30 @@ class GraphiteRequestTimingMiddleware(object):
             statsd.timing('view.{method}'.format(**data), ms)
 
 
+class GraphiteRequestDatabaseTimingMiddleware(object):
+    def process_view(self, request, view_func, view_args, view_kwargs):
+        thread_locals.request = request
+        request.stats_timings = defaultdict(lambda: 0)
+        request.stats_counts = defaultdict(lambda: 0)
+
+
+    def process_response(self, request, response):
+        timings = getattr(request, "stats_timings", {})
+        counts = getattr(request, "stats_counts", {})
+        thread_locals.request = None
+
+        for key, value in timings.iteritems():
+            statsd.timing(key, value)
+
+        for key, value in counts.iteritems():
+            statsd.incr(key, value)
+
+        return response
+
+    def process_exception(self, request, exception):
+        thread_locals.request = None
+
+
 class TastyPieRequestTimingMiddleware(GraphiteRequestTimingMiddleware):
     """statd's timing specific to Tastypie."""
 
@@ -60,4 +94,6 @@ class TastyPieRequestTimingMiddleware(GraphiteRequestTimingMiddleware):
             request._start_time = time.time()
         except (AttributeError, KeyError):
             super(TastyPieRequestTimingMiddleware, self).process_view(request,
-                view_func, view_args, view_kwargs)
+                                                                      view_func,
+                                                                      view_args,
+                                                                      view_kwargs)

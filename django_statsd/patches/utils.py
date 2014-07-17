@@ -1,23 +1,23 @@
+import time
 from django_statsd.clients import statsd
 from functools import partial, wraps
+from django_statsd.middleware import thread_locals
 
-def patch_method(target, name, external_decorator=None):
 
-    def decorator(patch_function):
-        original_function = getattr(target, name)
+def wrapped(method, stat_name, *args, **kwargs):
+    start = time.time()
+    result = method(*args, **kwargs)
+    duration = int((time.time() - start) * 1000)
+    statsd.timing(stat_name, duration)
 
-        @wraps(patch_function)
-        def wrapper(*args, **kw):
-            return patch_function(original_function, *args, **kw)
+    try:
+        request = thread_locals.request
+        request.stats_timings["request.{}".format(stat_name)] += duration
+        request.stats_counts["request.{}".format(stat_name)] += 1
+    except AttributeError:
+        pass
 
-        setattr(target, name, wrapper)
-        return wrapper
-
-    return decorator
-
-def wrapped(method, key, *args, **kw):
-    with statsd.timer(key):
-        return method(*args, **kw)
+    return result
 
 
 def wrap(method, key, *args, **kw):
