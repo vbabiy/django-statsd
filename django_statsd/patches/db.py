@@ -73,6 +73,6 @@ def patch():
     else:
         util.CursorWrapper.__getattr__ = pre_django_1_6_cursorwrapper_getattr
         util.CursorDebugWrapper.execute = patched_timing("execute")(
-            util.CursorWrapper.execute)
+            util.CursorDebugWrapper.execute)
         util.CursorDebugWrapper.executemany = patched_timing("executemany")(
-            util.CursorWrapper.executemany)
+            util.CursorDebugWrapper.executemany)
