@@ -6,7 +6,6 @@ from django.conf import settings
 from nose.exc import SkipTest
 from nose import tools as nose_tools
 from unittest2 import skipUnless
-
 from django import VERSION
 from django.core.urlresolvers import reverse
 from django.http import HttpResponse, HttpResponseForbidden
@@ -14,14 +13,13 @@ from django.test import TestCase
 from django.test.client import RequestFactory
 from django.utils import dictconfig
 from django.utils import unittest
-
 import mock
 from nose.tools import eq_
+
 from django_statsd.clients import get_client, statsd
-from django_statsd.patches import utils
-# from django_statsd.patches.db import (
 from django_statsd import middleware
 from django_statsd.patches.db import patched_timing
+
 
 cfg = {
     'version': 1,
