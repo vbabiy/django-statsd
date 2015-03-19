@@ -16,6 +16,14 @@ Credits:
 Changes
 -------
 
+0.3.14:
+
+- pypy testing support
+- log model changes
+- log celery events
+- log db queries
+- show lower/mean/upper values in debugbar, thanks jonathanslenders!
+
 0.3.12:
 
 - Event better Django 1.6 support for the patches, with tests.
@@ -103,9 +111,19 @@ First off, pick your client, one of:
   Use for the django debug toolbar, stores all the statsd pings on the request
   so they can be used in the toolbar.
 
+- django_statsd.clients.request_aggregate_toolbar
+
+  Django debug toolbar integration with the request_aggregate client (see
+  below).
+
 - django_statsd.clients.normal
 
   Use this for production, it just passes through to the real actual pystatsd.
+
+- django_statsd.clients.request_aggregate
+
+  The default statsd client modified to aggregate data per request. Useful for
+  knowing how much total time was spent in db or cache per request.
 
 - django_statsd.clients.log
 
@@ -208,6 +226,24 @@ The key is added on to the root. So if you've got a key of `view.GET` this
 would look that up on the graphite server with the key::
 
         stats.addons.view.GET
+
+Django Model save and delete integration
+----------------------------------------
+
+You can log all create, update and delete events of django models.
+Add to your Django settings::
+
+        STATSD_MODEL_SIGNALS = True
+
+Celery signals integration
+--------------------------
+
+You can log all the ``task_sent``, ``task_prerun``, ``task_postrun`` and
+``task_failure`` signals of celery along with the duration of succesful tasks.
+
+To enable this, add the following to your Django settings::
+
+        STATSD_CELERY_SIGNALS = True
 
 Front end timing integration
 ----------------------------
@@ -346,6 +382,8 @@ Contributors
 * ftobia
 * jawnb
 * fgallina
+* jonathanslenders
+* streeter
 
 See:
 
