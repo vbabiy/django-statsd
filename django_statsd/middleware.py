@@ -53,31 +53,29 @@ class GraphiteRequestTimingMiddleware(object):
             ms = int((time.time() - request._start_time) * 1000)
             data = dict(module=request._view_module, name=request._view_name,
                         method=request.method)
-            statsd.timing('view.{module}.{name}.{method}'.format(**data), ms)
-            statsd.timing('view.{module}.{method}'.format(**data), ms)
-            statsd.timing('view.{method}'.format(**data), ms)
+            keys = [
+                'view.{module}.{name}.{method}'.format(**data),
+                'view.{module}.{method}'.format(**data),
+                'view.{method}'.format(**data),
+            ]
+            for key in keys:
+                statsd.timing(key, ms)
         if hasattr(statsd, 'aggregate_request_stats'):
-            self._record_aggregate_time(request)
+            self._record_aggregate_time(request, keys)
 
-    def _record_aggregate_time(self, request):
+    def _record_aggregate_time(self, request, prefix_keys):
         timings = getattr(request, "stats_timings", {})
         counts = getattr(request, "stats_counts", {})
         statsd.aggregate_request_stats.request = None
 
         for key, value in timings.items():
-            statsd.timing(
-                'view.{module}.{name}.{method}.{key}'.format(
-                    module=request._view_module,
-                    name=request._view_name,
-                    method=request.method,
-                    key=key), value)
+            for key_prefix in prefix_keys:
+                statsd.timing('.'.join([key_prefix, key]), value)
 
         for key, value in counts.items():
-            statsd.incr(
-                'view.{module}.{name}.{method}.{key}'.format(
-                    module=request._view_module,
-                    name=request._view_name, method=request.method,
-                    key=key), value)
+            for key_prefix in prefix_keys:
+                statsd.incr('.'.join([key_prefix, key]), value)
+
 
 class TastyPieRequestTimingMiddleware(GraphiteRequestTimingMiddleware):
     """statd's timing specific to Tastypie."""
