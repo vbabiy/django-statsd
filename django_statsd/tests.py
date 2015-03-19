@@ -185,11 +185,11 @@ class TestRequestAggregateClient(TestCase):
             gmw.process_view(self.req, func, tuple(), dict())
             self.req.stats_timings = {'test': 0}
             gmw.process_response(self.req, self.res)
-        eq_(timing.call_count, 4)
+        eq_(timing.call_count, 6)
         names = ['view.%s.%s.GET' % (func.__module__, func.__name__),
                  'view.%s.GET' % func.__module__,
-                 'view.GET',
-                 'view.%s.%s.GET.test' % (func.__module__, func.__name__)]
+                 'view.GET']
+        names += ['{}.test'.format(n) for n in names]
         for expected, (args, kwargs) in zip(names, timing.call_args_list):
             eq_(expected, args[0])
 
@@ -200,11 +200,11 @@ class TestRequestAggregateClient(TestCase):
             gmw.process_view(self.req, func, tuple(), dict())
             self.req.stats_timings = {'test': 0}
             gmw.process_exception(self.req, self.res)
-        eq_(timing.call_count, 4)
+        eq_(timing.call_count, 6)
         names = ['view.%s.%s.GET' % (func.__module__, func.__name__),
                  'view.%s.GET' % func.__module__,
-                 'view.GET',
-                 'view.%s.%s.GET.test' % (func.__module__, func.__name__)]
+                 'view.GET']
+        names += ['{}.test'.format(n) for n in names]
         for expected, (args, kwargs) in zip(names, timing.call_args_list):
             eq_(expected, args[0])
 
