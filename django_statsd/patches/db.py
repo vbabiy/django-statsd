@@ -1,9 +1,6 @@
-from functools import wraps
 import django
 from django.db.backends import util
-import time
-from django_statsd.middleware import thread_locals
-from django_statsd.patches.utils import wrap
+from django_statsd.patches.utils import wrap, patch_method
 from django_statsd.clients import statsd
 
 
@@ -27,28 +24,19 @@ def pre_django_1_6_cursorwrapper_getattr(self, attr):
         return getattr(self.cursor, attr)
 
 
-def patched_timing(name):
-    def outer(func):
-        @wraps(func)
-        def wrapper(self, *args, **kwargs):
-            stat_name = key(self.db, name)
-            start = time.time()
+def patched_execute(orig_execute, self, *args, **kwargs):
+    with statsd.timer(key(self.db, 'execute')):
+        return orig_execute(self, *args, **kwargs)
 
-            result = func(self, *args, **kwargs)
 
-            duration = int((time.time() - start) * 1000)
-            statsd.timing(stat_name, duration)
+def patched_executemany(orig_executemany, self, *args, **kwargs):
+    with statsd.timer(key(self.db, 'executemany')):
+        return orig_executemany(self, *args, **kwargs)
 
-            try:
-                request = thread_locals.request
-                request.stats_timings[stat_name] += duration
-                request.stats_counts[stat_name] += 1
-            except AttributeError:
-                pass
 
-            return result
-        return wrapper
-    return outer
+def patched_callproc(orig_callproc, self, *args, **kwargs):
+    with statsd.timer(key(self.db, 'callproc')):
+        return orig_callproc(self, *args, **kwargs)
 
 
 def patch():
@@ -63,16 +51,11 @@ def patch():
         # In 1.6+ util.CursorDebugWrapper just makes calls to CursorWrapper
         # As such, we only need to instrument CursorWrapper.
         # Instrumenting both will result in duplicated metrics
-        util.CursorWrapper.execute = patched_timing("execute")(
-            util.CursorWrapper.execute)
-        util.CursorWrapper.executemany = patched_timing("executemany")(
-            util.CursorWrapper.executemany)
-        util.CursorWrapper.callproc = patched_timing("callproc")(
-            util.CursorWrapper.callproc)
-
+        patch_method(util.CursorWrapper, 'execute')(patched_execute)
+        patch_method(util.CursorWrapper, 'executemany')(patched_executemany)
+        patch_method(util.CursorWrapper, 'callproc')(patched_callproc)
     else:
         util.CursorWrapper.__getattr__ = pre_django_1_6_cursorwrapper_getattr
-        util.CursorDebugWrapper.execute = patched_timing("execute")(
-            util.CursorDebugWrapper.execute)
-        util.CursorDebugWrapper.executemany = patched_timing("executemany")(
-            util.CursorDebugWrapper.executemany)
+        patch_method(util.CursorDebugWrapper, 'execute')(patched_execute)
+        patch_method(
+            util.CursorDebugWrapper, 'executemany')(patched_executemany)
