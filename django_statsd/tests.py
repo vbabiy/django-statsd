@@ -189,7 +189,7 @@ class TestRequestAggregateClient(TestCase):
         names = ['view.%s.%s.GET' % (func.__module__, func.__name__),
                  'view.%s.GET' % func.__module__,
                  'view.GET']
-        names += ['{}.test'.format(n) for n in names]
+        names += ['{0}.test'.format(n) for n in names]
         for expected, (args, kwargs) in zip(names, timing.call_args_list):
             eq_(expected, args[0])
 
@@ -204,7 +204,7 @@ class TestRequestAggregateClient(TestCase):
         names = ['view.%s.%s.GET' % (func.__module__, func.__name__),
                  'view.%s.GET' % func.__module__,
                  'view.GET']
-        names += ['{}.test'.format(n) for n in names]
+        names += ['{0}.test'.format(n) for n in names]
         for expected, (args, kwargs) in zip(names, timing.call_args_list):
             eq_(expected, args[0])
 
