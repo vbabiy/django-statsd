@@ -60,8 +60,8 @@ class GraphiteRequestTimingMiddleware(object):
             ]
             for key in keys:
                 statsd.timing(key, ms)
-        if hasattr(statsd, 'aggregate_request_stats'):
-            self._record_aggregate_time(request, keys)
+            if hasattr(statsd, 'aggregate_request_stats'):
+                self._record_aggregate_time(request, keys)
 
     def _record_aggregate_time(self, request, prefix_keys):
         timings = getattr(request, "stats_timings", {})
