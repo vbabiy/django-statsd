@@ -5,7 +5,12 @@ import sys
 from django.conf import settings
 from nose.exc import SkipTest
 from nose import tools as nose_tools
-from unittest2 import skipUnless
+try:
+    # Python 2.7, Python 3.x
+    from unittest import skipUnless
+except ImportError:
+    # Python 2.6
+    from unittest2 import skipUnless
 
 from django import VERSION
 from django.core.urlresolvers import reverse
@@ -108,8 +113,10 @@ class TestTiming(unittest.TestCase):
     def test_request_timing_tastypie(self, timing):
         func = lambda x: x
         gmw = middleware.TastyPieRequestTimingMiddleware()
-        gmw.process_view(self.req, func, tuple(), {'api_name': 'my_api_name',
-            'resource_name': 'my_resource_name'})
+        gmw.process_view(self.req, func, tuple(), {
+            'api_name': 'my_api_name',
+            'resource_name': 'my_resource_name'
+        })
         gmw.process_response(self.req, self.res)
         eq_(timing.call_count, 3)
         names = ['view.my_api_name.my_resource_name.GET',
@@ -474,27 +481,47 @@ class TestPatchMethod(TestCase):
 
 
 class TestCursorWrapperPatching(TestCase):
+    example_queries = {
+        'select': 'select * from something;',
+        'insert': 'insert (1, 2) into something;',
+        'update': 'update something set a=1;',
+    }
 
     def test_patched_callproc_calls_timer(self):
-        with mock.patch.object(statsd, 'timer') as timer:
-            db = mock.Mock(executable_name='name', alias='alias')
-            instance = mock.Mock(db=db)
-            patched_callproc(lambda *args, **kwargs: None, instance)
-            self.assertEqual(timer.call_count, 1)
+        for operation, query in self.example_queries.items():
+            with mock.patch.object(statsd, 'timer') as timer:
+                client = mock.Mock(executable_name='client_executable_name')
+                db = mock.Mock(executable_name='name', alias='alias', client=client)
+                instance = mock.Mock(db=db)
+
+                patched_callproc(lambda *args, **kwargs: None, instance, query)
+
+                self.assertEqual(timer.call_count, 1)
+                self.assertEqual(timer.call_args[0][0], 'db.client_executable_name.alias.callproc.%s' % operation)
 
     def test_patched_execute_calls_timer(self):
-        with mock.patch.object(statsd, 'timer') as timer:
-            db = mock.Mock(executable_name='name', alias='alias')
-            instance = mock.Mock(db=db)
-            patched_execute(lambda *args, **kwargs: None, instance)
-            self.assertEqual(timer.call_count, 1)
+        for operation, query in self.example_queries.items():
+            with mock.patch.object(statsd, 'timer') as timer:
+                client = mock.Mock(executable_name='client_executable_name')
+                db = mock.Mock(executable_name='name', alias='alias', client=client)
+                instance = mock.Mock(db=db)
+
+                patched_execute(lambda *args, **kwargs: None, instance, query)
+
+                self.assertEqual(timer.call_count, 1)
+                self.assertEqual(timer.call_args[0][0], 'db.client_executable_name.alias.execute.%s' % operation)
 
     def test_patched_executemany_calls_timer(self):
-        with mock.patch.object(statsd, 'timer') as timer:
-            db = mock.Mock(executable_name='name', alias='alias')
-            instance = mock.Mock(db=db)
-            patched_executemany(lambda *args, **kwargs: None, instance)
-            self.assertEqual(timer.call_count, 1)
+        for operation, query in self.example_queries.items():
+            with mock.patch.object(statsd, 'timer') as timer:
+                client = mock.Mock(executable_name='client_executable_name')
+                db = mock.Mock(executable_name='name', alias='alias', client=client)
+                instance = mock.Mock(db=db)
+
+                patched_executemany(lambda *args, **kwargs: None, instance, query)
+
+                self.assertEqual(timer.call_count, 1)
+                self.assertEqual(timer.call_args[0][0], 'db.client_executable_name.alias.executemany.%s' % operation)
 
     @mock.patch(
         'django_statsd.patches.db.pre_django_1_6_cursorwrapper_getattr')

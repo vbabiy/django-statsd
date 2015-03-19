@@ -16,6 +16,14 @@ Credits:
 Changes
 -------
 
+0.3.14:
+
+- pypy testing support
+- log model changes
+- log celery events
+- log db queries
+- show lower/mean/upper values in debugbar, thanks jonathanslenders!
+
 0.3.12:
 
 - Event better Django 1.6 support for the patches, with tests.
@@ -209,6 +217,24 @@ would look that up on the graphite server with the key::
 
         stats.addons.view.GET
 
+Django Model save and delete integration
+----------------------------------------
+
+You can log all create, update and delete events of django models.
+Add to your Django settings::
+
+        STATSD_MODEL_SIGNALS = True
+
+Celery signals integration
+--------------------------
+
+You can log all the ``task_sent``, ``task_prerun``, ``task_postrun`` and
+``task_failure`` signals of celery along with the duration of succesful tasks.
+
+To enable this, add the following to your Django settings::
+
+        STATSD_CELERY_SIGNALS = True
+
 Front end timing integration
 ----------------------------
 
@@ -346,6 +372,8 @@ Contributors
 * ftobia
 * jawnb
 * fgallina
+* jonathanslenders
+* streeter
 
 See:
 

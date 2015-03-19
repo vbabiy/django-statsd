@@ -1,4 +1,3 @@
-from collections import defaultdict
 import inspect
 import time
 
@@ -8,6 +7,7 @@ from django_statsd.clients import statsd
 
 
 class GraphiteMiddleware(object):
+
     def process_response(self, request, response):
         statsd.incr('response.%s' % response.status_code)
         if hasattr(request, 'user') and request.user.is_authenticated():
@@ -88,5 +88,5 @@ class TastyPieRequestTimingMiddleware(GraphiteRequestTimingMiddleware):
             request._view_name = view_kwargs['resource_name']
             request._start_time = time.time()
         except (AttributeError, KeyError):
-            super(TastyPieRequestTimingMiddleware, self).process_view(request,
-                view_func, view_args, view_kwargs)
+            super(TastyPieRequestTimingMiddleware, self).process_view(
+                request, view_func, view_args, view_kwargs)
