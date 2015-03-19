@@ -35,14 +35,14 @@ class GraphiteRequestTimingMiddleware(object):
         except AttributeError:
             pass
 
-        if getattr(statsd, 'aggregate_stats_per_request', False):
-            statsd.thread_locals.request = request
+        if hasattr(statsd, 'aggregate_request_stats'):
+            statsd.aggregate_request_stats.request = request
             request.stats_timings = defaultdict(lambda: 0)
             request.stats_counts = defaultdict(lambda: 0)
 
     def process_response(self, request, response):
         self._record_time(request)
-        if getattr(statsd, 'aggregate_stats_per_request', False):
+        if hasattr(statsd, 'aggregate_request_stats'):
             self._record_aggregate_time(request)
 
         return response
@@ -62,7 +62,7 @@ class GraphiteRequestTimingMiddleware(object):
     def _record_aggregate_time(self, request):
         timings = getattr(request, "stats_timings", {})
         counts = getattr(request, "stats_counts", {})
-        statsd.thread_locals.request = None
+        statsd.aggregate_request_stats.request = None
 
         for key, value in timings.iteritems():
             statsd.timing(
