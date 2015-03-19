@@ -1,3 +1,4 @@
+from collections import defaultdict
 import inspect
 import time
 
@@ -42,9 +43,6 @@ class GraphiteRequestTimingMiddleware(object):
 
     def process_response(self, request, response):
         self._record_time(request)
-        if hasattr(statsd, 'aggregate_request_stats'):
-            self._record_aggregate_time(request)
-
         return response
 
     def process_exception(self, request, exception):
@@ -58,13 +56,15 @@ class GraphiteRequestTimingMiddleware(object):
             statsd.timing('view.{module}.{name}.{method}'.format(**data), ms)
             statsd.timing('view.{module}.{method}'.format(**data), ms)
             statsd.timing('view.{method}'.format(**data), ms)
+        if hasattr(statsd, 'aggregate_request_stats'):
+            self._record_aggregate_time(request)
 
     def _record_aggregate_time(self, request):
         timings = getattr(request, "stats_timings", {})
         counts = getattr(request, "stats_counts", {})
         statsd.aggregate_request_stats.request = None
 
-        for key, value in timings.iteritems():
+        for key, value in timings.items():
             statsd.timing(
                 'view.{module}.{name}.{method}.{key}'.format(
                     module=request._view_module,
@@ -72,7 +72,7 @@ class GraphiteRequestTimingMiddleware(object):
                     method=request.method,
                     key=key), value)
 
-        for key, value in counts.iteritems():
+        for key, value in counts.items():
             statsd.incr(
                 'view.{module}.{name}.{method}.{key}'.format(
                     module=request._view_module,
