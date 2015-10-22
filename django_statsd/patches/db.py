@@ -1,5 +1,8 @@
 import django
-from django.db.backends import util
+try:
+    from django.db.backends import utils as util
+except ImportError:
+    from django.db.backends import util
 
 from django_statsd.patches.utils import wrap, patch_method
 from django_statsd.clients import statsd
@@ -32,6 +35,7 @@ def _get_query_type(query):
 def patched_execute(orig_execute, self, query, *args, **kwargs):
     with statsd.timer(key(self.db, 'execute.%s' % _get_query_type(query))):
         return orig_execute(self, query, *args, **kwargs)
+
 
 def patched_executemany(orig_executemany, self, query, *args, **kwargs):
     with statsd.timer(key(self.db, 'executemany.%s' % _get_query_type(query))):

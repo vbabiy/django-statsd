@@ -1,6 +1,12 @@
 django-statsd
 =========================================
 
+Looking for a maintainer
+========================
+
+I really don't work on Django Statsd anymore. I'm keen to find a maintainer or
+someone who would like to look after this project long term.
+
 Django Statsd
 =============
 
@@ -15,6 +21,12 @@ Credits:
 
 Changes
 -------
+
+0.3.15:
+
+- push from travis to pypi to keep files clean
+- allow less statsd in the middleware
+- fix to a specific statsd version
 
 0.3.14:
 
@@ -178,6 +190,14 @@ To get timings for your database or your cache, put in some monkeypatches::
                 'django_statsd.patches.cache',
         ]
 
+You can change the host that stats are sent to with the `STATSD_HOST` setting::
+
+        STATSD_HOST = 'localhost'
+
+Similarly, you can use the `STATSD_PORT`setting to customize the port number (which defaults to `8125`)::
+
+        STATSD_PORT = 8125
+
 Toolbar integration
 -------------------
 
@@ -336,6 +356,13 @@ everyone not in INTERNAL_IPS::
 
         STATSD_RECORD_GUARD = internal_only
 
+STATSD_VIEW_TIMER_DETAILS (optional)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The middleware sends timing pings for the almost the same thing three times
+when accessing a view: `module.name.method`, `module.method` and `method` by
+default. Setting this to `False` just does the former.
+
 Logging errors
 ~~~~~~~~~~~~~~
 
@@ -354,6 +381,12 @@ Testing
 You can run tests with the following command:
 
     DJANGO_SETTINGS_MODULE='django_statsd.test_settings' nosetests
+
+If you wish test with Python 2.6, make sure to install the unittest2_ module with the following command:
+
+    pip install unittest2
+
+.. _unittest2: https://pypi.python.org/pypi/unittest2
 
 Nose
 ====

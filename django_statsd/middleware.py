@@ -2,6 +2,7 @@ from collections import defaultdict
 import inspect
 import time
 
+from django.conf import settings
 from django.http import Http404
 
 from django_statsd.clients import statsd
@@ -53,11 +54,12 @@ class GraphiteRequestTimingMiddleware(object):
             ms = int((time.time() - request._start_time) * 1000)
             data = dict(module=request._view_module, name=request._view_name,
                         method=request.method)
-            keys = [
-                'view.{module}.{name}.{method}'.format(**data),
-                'view.{module}.{method}'.format(**data),
-                'view.{method}'.format(**data),
-            ]
+            keys = ['view.{module}.{name}.{method}'.format(**data)]
+            if getattr(settings, 'STATSD_VIEW_TIMER_DETAILS', True):
+                keys.extend([
+                    'view.{module}.{method}'.format(**data),
+                    'view.{method}'.format(**data),
+                ])
             for key in keys:
                 statsd.timing(key, ms)
             if hasattr(statsd, 'aggregate_request_stats'):

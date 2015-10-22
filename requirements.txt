@@ -1,5 +1,4 @@
 mock
 nose
-unittest2
-statsd>=2.0.0
+statsd==2.1.2
 django<1.7
