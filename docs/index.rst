@@ -1,6 +1,12 @@
 django-statsd
 =========================================
 
+Looking for a maintainer
+========================
+
+I really don't work on Django Statsd anymore. I'm keen to find a maintainer or
+someone who would like to look after this project long term.
+
 Django Statsd
 =============
 
@@ -15,6 +21,20 @@ Credits:
 
 Changes
 -------
+
+0.3.15:
+
+- push from travis to pypi to keep files clean
+- allow less statsd in the middleware
+- fix to a specific statsd version
+
+0.3.14:
+
+- pypy testing support
+- log model changes
+- log celery events
+- log db queries
+- show lower/mean/upper values in debugbar, thanks jonathanslenders!
 
 0.3.12:
 
@@ -103,9 +123,19 @@ First off, pick your client, one of:
   Use for the django debug toolbar, stores all the statsd pings on the request
   so they can be used in the toolbar.
 
+- django_statsd.clients.request_aggregate_toolbar
+
+  Django debug toolbar integration with the request_aggregate client (see
+  below).
+
 - django_statsd.clients.normal
 
   Use this for production, it just passes through to the real actual pystatsd.
+
+- django_statsd.clients.request_aggregate
+
+  The default statsd client modified to aggregate data per request. Useful for
+  knowing how much total time was spent in db or cache per request.
 
 - django_statsd.clients.log
 
@@ -160,6 +190,14 @@ To get timings for your database or your cache, put in some monkeypatches::
                 'django_statsd.patches.cache',
         ]
 
+You can change the host that stats are sent to with the `STATSD_HOST` setting::
+
+        STATSD_HOST = 'localhost'
+
+Similarly, you can use the `STATSD_PORT`setting to customize the port number (which defaults to `8125`)::
+
+        STATSD_PORT = 8125
+
 Toolbar integration
 -------------------
 
@@ -208,6 +246,24 @@ The key is added on to the root. So if you've got a key of `view.GET` this
 would look that up on the graphite server with the key::
 
         stats.addons.view.GET
+
+Django Model save and delete integration
+----------------------------------------
+
+You can log all create, update and delete events of django models.
+Add to your Django settings::
+
+        STATSD_MODEL_SIGNALS = True
+
+Celery signals integration
+--------------------------
+
+You can log all the ``task_sent``, ``task_prerun``, ``task_postrun`` and
+``task_failure`` signals of celery along with the duration of succesful tasks.
+
+To enable this, add the following to your Django settings::
+
+        STATSD_CELERY_SIGNALS = True
 
 Front end timing integration
 ----------------------------
@@ -300,6 +356,13 @@ everyone not in INTERNAL_IPS::
 
         STATSD_RECORD_GUARD = internal_only
 
+STATSD_VIEW_TIMER_DETAILS (optional)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The middleware sends timing pings for the almost the same thing three times
+when accessing a view: `module.name.method`, `module.method` and `method` by
+default. Setting this to `False` just does the former.
+
 Logging errors
 ~~~~~~~~~~~~~~
 
@@ -318,6 +381,12 @@ Testing
 You can run tests with the following command:
 
     DJANGO_SETTINGS_MODULE='django_statsd.test_settings' nosetests
+
+If you wish test with Python 2.6, make sure to install the unittest2_ module with the following command:
+
+    pip install unittest2
+
+.. _unittest2: https://pypi.python.org/pypi/unittest2
 
 Nose
 ====
@@ -346,6 +415,8 @@ Contributors
 * ftobia
 * jawnb
 * fgallina
+* jonathanslenders
+* streeter
 
 See:
 

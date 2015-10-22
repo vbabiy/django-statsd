@@ -5,7 +5,12 @@ import sys
 from django.conf import settings
 from nose.exc import SkipTest
 from nose import tools as nose_tools
-from unittest2 import skipUnless
+try:
+    # Python 2.7, Python 3.x
+    from unittest import skipUnless
+except ImportError:
+    # Python 2.6
+    from unittest2 import skipUnless
 
 from django import VERSION
 from django.core.urlresolvers import reverse
@@ -108,8 +113,10 @@ class TestTiming(unittest.TestCase):
     def test_request_timing_tastypie(self, timing):
         func = lambda x: x
         gmw = middleware.TastyPieRequestTimingMiddleware()
-        gmw.process_view(self.req, func, tuple(), {'api_name': 'my_api_name',
-            'resource_name': 'my_resource_name'})
+        gmw.process_view(self.req, func, tuple(), {
+            'api_name': 'my_api_name',
+            'resource_name': 'my_resource_name'
+        })
         gmw.process_response(self.req, self.res)
         eq_(timing.call_count, 3)
         names = ['view.my_api_name.my_resource_name.GET',
@@ -155,6 +162,51 @@ class TestClient(unittest.TestCase):
         client.incr('testing')
         eq_(client.cache, {'testing|count': [[1, 1]]})
 
+
+
+class TestRequestAggregateClient(TestCase):
+    statsd_client = 'django_statsd.clients.request_aggregate'
+
+    def setUp(self):
+        self.original_statsd = middleware.statsd
+        with self.settings(STATSD_CLIENT=self.statsd_client):
+            middleware.statsd = get_client()
+        self.req = RequestFactory().get('/')
+        self.res = HttpResponse()
+
+    def tearDown(self):
+        middleware.statsd = self.original_statsd
+
+    def test_request_timing(self):
+        func = lambda x: x
+        with mock.patch.object(middleware.statsd, 'timing') as timing:
+            gmw = middleware.GraphiteRequestTimingMiddleware()
+
+            gmw.process_view(self.req, func, tuple(), dict())
+            self.req.stats_timings = {'test': 0}
+            gmw.process_response(self.req, self.res)
+        eq_(timing.call_count, 6)
+        names = ['view.%s.%s.GET' % (func.__module__, func.__name__),
+                 'view.%s.GET' % func.__module__,
+                 'view.GET']
+        names += ['{0}.test'.format(n) for n in names]
+        for expected, (args, kwargs) in zip(names, timing.call_args_list):
+            eq_(expected, args[0])
+
+    def test_request_timing_exception(self):
+        func = lambda x: x
+        with mock.patch.object(middleware.statsd, 'timing') as timing:
+            gmw = middleware.GraphiteRequestTimingMiddleware()
+            gmw.process_view(self.req, func, tuple(), dict())
+            self.req.stats_timings = {'test': 0}
+            gmw.process_exception(self.req, self.res)
+        eq_(timing.call_count, 6)
+        names = ['view.%s.%s.GET' % (func.__module__, func.__name__),
+                 'view.%s.GET' % func.__module__,
+                 'view.GET']
+        names += ['{0}.test'.format(n) for n in names]
+        for expected, (args, kwargs) in zip(names, timing.call_args_list):
+            eq_(expected, args[0])
 
 class TestMetlogClient(TestCase):
 
@@ -323,13 +375,15 @@ class TestRecord(TestCase):
                                {'client': 'boomerang'}).status_code == 400
 
     def test_boomerang_minimum(self):
-        assert self.client.get(self.url,
-                               {'client': 'boomerang',
-                                'nt_nav_st': 1}).content == 'recorded'
+        content = self.client.get(self.url,
+                                  {'client': 'boomerang',
+                                   'nt_nav_st': 1}).content.decode()
+        assert(content == 'recorded')
 
     @mock.patch('django_statsd.views.process_key')
     def test_boomerang_something(self, process_key):
-        assert self.client.get(self.url, self.good).content == 'recorded'
+        content = self.client.get(self.url, self.good).content.decode()
+        assert content == 'recorded'
         assert process_key.called
 
     def test_boomerang_post(self):
@@ -474,27 +528,47 @@ class TestPatchMethod(TestCase):
 
 
 class TestCursorWrapperPatching(TestCase):
+    example_queries = {
+        'select': 'select * from something;',
+        'insert': 'insert (1, 2) into something;',
+        'update': 'update something set a=1;',
+    }
 
     def test_patched_callproc_calls_timer(self):
-        with mock.patch.object(statsd, 'timer') as timer:
-            db = mock.Mock(executable_name='name', alias='alias')
-            instance = mock.Mock(db=db)
-            patched_callproc(lambda *args, **kwargs: None, instance)
-            self.assertEqual(timer.call_count, 1)
+        for operation, query in list(self.example_queries.items()):
+            with mock.patch.object(statsd, 'timer') as timer:
+                client = mock.Mock(executable_name='client_executable_name')
+                db = mock.Mock(executable_name='name', alias='alias', client=client)
+                instance = mock.Mock(db=db)
+
+                patched_callproc(lambda *args, **kwargs: None, instance, query)
+
+                self.assertEqual(timer.call_count, 1)
+                self.assertEqual(timer.call_args[0][0], 'db.client_executable_name.alias.callproc.%s' % operation)
 
     def test_patched_execute_calls_timer(self):
-        with mock.patch.object(statsd, 'timer') as timer:
-            db = mock.Mock(executable_name='name', alias='alias')
-            instance = mock.Mock(db=db)
-            patched_execute(lambda *args, **kwargs: None, instance)
-            self.assertEqual(timer.call_count, 1)
+        for operation, query in list(self.example_queries.items()):
+            with mock.patch.object(statsd, 'timer') as timer:
+                client = mock.Mock(executable_name='client_executable_name')
+                db = mock.Mock(executable_name='name', alias='alias', client=client)
+                instance = mock.Mock(db=db)
+
+                patched_execute(lambda *args, **kwargs: None, instance, query)
+
+                self.assertEqual(timer.call_count, 1)
+                self.assertEqual(timer.call_args[0][0], 'db.client_executable_name.alias.execute.%s' % operation)
 
     def test_patched_executemany_calls_timer(self):
-        with mock.patch.object(statsd, 'timer') as timer:
-            db = mock.Mock(executable_name='name', alias='alias')
-            instance = mock.Mock(db=db)
-            patched_executemany(lambda *args, **kwargs: None, instance)
-            self.assertEqual(timer.call_count, 1)
+        for operation, query in list(self.example_queries.items()):
+            with mock.patch.object(statsd, 'timer') as timer:
+                client = mock.Mock(executable_name='client_executable_name')
+                db = mock.Mock(executable_name='name', alias='alias', client=client)
+                instance = mock.Mock(db=db)
+
+                patched_executemany(lambda *args, **kwargs: None, instance, query)
+
+                self.assertEqual(timer.call_count, 1)
+                self.assertEqual(timer.call_args[0][0], 'db.client_executable_name.alias.executemany.%s' % operation)
 
     @mock.patch(
         'django_statsd.patches.db.pre_django_1_6_cursorwrapper_getattr')
@@ -508,8 +582,10 @@ class TestCursorWrapperPatching(TestCase):
                                     executemany,
                                     _getattr):
         try:
+            from django.db.backends import utils as util
+        except ImportError:
             from django.db.backends import util
-
+        try:
             # We need to patch CursorWrapper like this because setting
             # __getattr__ on Mock instances raises AttributeError.
             class CursorWrapper(object):
